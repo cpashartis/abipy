@@ -13,32 +13,34 @@ allows one to get a list of parallel configuration and their expected efficiency
 """
 from __future__ import annotations
 
-import sys
-import os
 import abc
-import string
 import copy
 import getpass
 import json
+import logging
 import math
-from . import qutils as qu
-
+import os
+import string
+import sys
 from collections import namedtuple
 from subprocess import Popen, PIPE
 from typing import Optional, List, Tuple, Any
-from pymatgen.util.io_utils import AtomicFile
-from monty.string import is_string, list_strings
+from warnings import warn
+
 from monty.collections import AttrDict
 from monty.functools import lazy_property
 from monty.inspect import all_subclasses
 from monty.io import FileLock
 from monty.json import MSONable
+from monty.string import is_string, list_strings
 from pymatgen.core.units import Memory
-from .utils import Condition
+from pymatgen.util.io_utils import AtomicFile
+
+from . import qutils as qu
 from .launcher import ScriptEditor
 from .qjobs import QueueJob
+from .utils import Condition
 
-import logging
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -1807,6 +1809,29 @@ class SGEAdapter(QueueAdapter):
 $${qverbatim}
 """
 
+    def validate_qparams(self):
+        """
+        Check if the keys specified by the user in qparams are supported.
+
+        Raise:
+            `ValueError` if errors.
+        """
+
+        super().validate_qparams()
+
+        # introduced since SGE SHOULD be told how many cores to queue with or else it assumes 1
+        # Parse for warnings that may cause issues
+        warn_msg = ""
+        for param in self.qparams:
+            if param not in ["parallel_environment"]:
+                warn_msg += f"{param} should be included in the qparam section\n"
+            if warn_msg != "":
+                warn_msg += "You may not generate the proper submit script"
+
+        if warn_msg:
+            warn(warn_msg, UserWarning)
+            logger.warning(warn_msg)
+
     def set_qname(self, qname):
         super().set_qname(qname)
         if qname:
@@ -1854,7 +1879,7 @@ $${qverbatim}
 
     def exclude_nodes(self, nodes):
         """Method to exclude nodes in the calculation"""
-        raise self.Error('qadapter failed to exclude nodes, not implemented yet in sge')
+        raise self.Error('There is a way, but not implemented yet - # -l  hostname=!(nodename|nodename2)')
 
     def _get_njobs_in_queue(self, username):
         # need string not bytes so must use universal_newlines

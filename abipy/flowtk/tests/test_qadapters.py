@@ -464,3 +464,87 @@ mpirun  -n 3 executable < stdin > stdout 2> stderr
         aequal(qad_exclusive.get_select(), '1:ncpus=2:mem=48000mb:mpiprocs=2+'
                                            '2:ncpus=24:mem=48000mb:mpiprocs=24')
 
+
+@unittest.skipIf(sys.platform.startswith("win"), "Skipping for Windows")
+class SGEAdapterTest(AbipyTest):
+    """Test suite for PbsPro adapter."""
+    QDICT = safe_load("""\
+priority: 1
+queue:
+    qtype: sge
+    qname: moon
+    qparams:
+        account_name: TK-421
+        parallel_environment: mpich
+limits:
+    timelimit: 0:0:10
+    min_cores: 3
+    max_cores: 200
+job:
+    mpi_runner: mpirun
+hardware:
+    num_nodes: 100
+    sockets_per_node: 2
+    cores_per_socket: 4
+    mem_per_node: 8 Gb""")
+
+    QDICT_no_par_env = safe_load("""\
+priority: 1
+queue:
+    qtype: sge
+    qname: moon
+    qparams:
+        account_name: TK-421
+limits:
+    timelimit: 0:0:10
+    min_cores: 3
+    max_cores: 200
+job:
+    mpi_runner: mpirun
+hardware:
+    num_nodes: 100
+    sockets_per_node: 2
+    cores_per_socket: 4
+    mem_per_node: 8 Gb""")
+
+    def test_methods(self):
+        self.maxDiff = None
+
+        qad = make_qadapter(**self.QDICT)
+
+        assert qad.QTYPE == "sge"
+        assert qad.has_mpi and not qad.has_omp
+        assert (qad.mpi_procs, qad.omp_threads) == (3, 1)
+        assert qad.priority == 1 and qad.num_launches == 0 and qad.last_launch is None
+
+        with self.assertWarns(UserWarning):
+            make_qadapter(**self.QDICT_no_par_env)
+
+        qad.set_mpi_procs(4)
+
+        s = qad.get_script_str("job_name", "/launch_dir", "executable", "qout_path", "qerr_path",
+                               stdin="stdin", stdout="stdout", stderr="stderr")
+        print(s)
+        self.assertMultiLineEqual(s, """\
+#!/bin/bash
+
+#$ -account_name TK-421
+#$ -N job_name
+#$ -q moon
+#$ -pe mpich 4
+#$ -l h_rt=0:0:10
+# request a per slot memory limit of size bytes.
+##$ -l h_vmem=1024M
+##$ -l mf=1024M
+###$ -j no
+# Submission environment
+##$ -S /bin/bash
+###$ -cwd                       # Change to current working directory
+###$ -V                         # Export environment variables into script
+#$ -e qerr_path
+#$ -o qout_path
+cd /launch_dir
+# OpenMp Environment
+export OMP_NUM_THREADS=1
+mpirun  -n 4 executable < stdin > stdout 2> stderr\n""")
+
