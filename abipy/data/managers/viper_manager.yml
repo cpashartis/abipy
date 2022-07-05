@@ -18,7 +18,7 @@ qadapters:
        qname: euspec.q
        qtype: sge
        qparams:
-           parallel_environment: slots
+           parallel_environment: slots  # for other clusters could be mpich, so forth
     limits:
        timelimit: 0:10:0
        min_cores: 1

@@ -113,7 +113,11 @@ class ScriptEditor(object):
             self.load_module(module)
 
     def load_module(self, module):
-        self._add('module load ' + module + " 2>> mods.err")
+        # spider is for modules made slightly differently
+        if 'spider ' in module:
+            self._add('module ' + module + " 2>> mods.err")
+        else:
+            self._add('module load ' + module + " 2>> mods.err")
 
     def add_line(self, line):
         self._add(line)

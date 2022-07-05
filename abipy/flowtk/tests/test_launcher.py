@@ -12,11 +12,12 @@ def test_script_editor():
     se.add_emptyline()
     se.add_comment("This is a comment")
     se.declare_vars({"FOO1": "BAR1"})
-    se.load_modules(["module1", "module2"])
+    se.load_modules(["module1", "spider module2"])
     s = se.get_script_str()
     assert "export FOO=BAR" in s
     assert "export FOO1=BAR1" in s
     assert "module load module1" in s
+    assert "module spider module2" in s
 
 
 class PyFlowSchedulerTest(AbipyTest):
